@@ -1,13 +1,15 @@
+// src/telegram/telegram.module.ts
 import { Module } from '@nestjs/common';
-import { TelegramService } from './telegram.service';
+import { TelegramAppService } from './app/telegram-app.service';
 import { TelegramController } from './telegram.controller';
 import { EventsModule } from '../events/events.module';
 import { ConfigModule } from '@nestjs/config';
+import { TelegramClientService } from './infra/telegram-client.service';
 
 @Module({
   imports: [ConfigModule, EventsModule],
-  providers: [TelegramService],
+  providers: [TelegramClientService, TelegramAppService],
   controllers: [TelegramController],
-  exports: [TelegramService],
+  exports: [TelegramAppService],
 })
 export class TelegramModule {}
