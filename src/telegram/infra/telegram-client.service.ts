@@ -14,6 +14,8 @@ import { NewMessage, NewMessageEvent } from 'telegram/events';
 
 import * as readline from 'node:readline/promises';
 import { stdin as input, stdout as output } from 'node:process';
+import { Entity } from 'telegram/define';
+import { safeClassName } from './helper';
 
 /**
  * Purpose: Infrastructure-only wrapper around GramJS.
@@ -55,6 +57,7 @@ export class TelegramClientService implements OnModuleInit, OnModuleDestroy {
    * - Else => connect immediately.
    */
   async onModuleInit(): Promise<void> {
+    console.log('Loading Telegram MTProto client...');
     const apiId = Number(this.config.getOrThrow('TG_API_ID'));
     const apiHash = this.config.getOrThrow<string>('TG_API_HASH');
     const saved = this.config.get<string>('TG_SESSION_STRING') ?? '';
@@ -87,6 +90,7 @@ export class TelegramClientService implements OnModuleInit, OnModuleDestroy {
     } else {
       await this.client.connect();
       this.logger.log('Telegram MTProto connected with saved session.');
+      console.log('Connected to Telegram MTProto');
     }
   }
 
@@ -107,10 +111,47 @@ export class TelegramClientService implements OnModuleInit, OnModuleDestroy {
    * Join a public channel / resolve peer and invoke JoinChannel.
    * @param identifier username ('@channelName') or t.me link or numeric id
    */
-  async joinChannel(identifier: string): Promise<void> {
+  async joinAndResolve(identifier: string): Promise<{
+    tgId: string;
+    username?: string;
+    title?: string;
+  }> {
     const entity = await this.client.getEntity(identifier);
-    await this.client.invoke(new Api.channels.JoinChannel({ channel: entity }));
-    this.logger.log(`Joined channel: ${identifier}`);
+
+    if (entity instanceof Api.Channel) {
+      await this.client.invoke(
+        new Api.channels.JoinChannel({ channel: entity }),
+      );
+      this.logger.log(`Joined channel: ${identifier}`);
+      return {
+        tgId: String(entity.id),
+        username: entity.username ?? undefined,
+        title: entity.title,
+      };
+    }
+    if (entity instanceof Api.Chat) {
+      return {
+        tgId: `chat:${String(entity.id)}`,
+        title: entity.title ?? undefined,
+      };
+    }
+    if (entity instanceof Api.User) {
+      return {
+        tgId: `user:${String(entity.id)}`,
+        username: entity.username ?? undefined,
+        title:
+          [entity.firstName, entity.lastName].filter(Boolean).join(' ') ||
+          undefined,
+      };
+    }
+    if (entity instanceof Api.ChannelForbidden) {
+      return {
+        tgId: String(entity.id),
+        title: entity.title ?? undefined,
+      };
+    }
+
+    throw new Error(`Unsupported peer type: ${safeClassName(entity)}`);
   }
 
   /**

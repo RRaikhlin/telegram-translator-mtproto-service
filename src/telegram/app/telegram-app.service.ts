@@ -120,6 +120,7 @@ export class TelegramAppService implements OnModuleInit, OnModuleDestroy {
     }
 
     const payload: NewPostEventPayload = { channelId, messageId, text, date };
+    this.logger.log(`Publishing telegram.post.created for ${key}`);
     this.events.emitNewPost(payload); // fire-and-forget
     this.processedRepo.markProcessed(key);
 
@@ -130,12 +131,15 @@ export class TelegramAppService implements OnModuleInit, OnModuleDestroy {
 
   /**
    * Subscribe to a channel by identifier (username, t.me link, or numeric id).
-   * Thin orchestration: delegate to infra client; add business checks here if needed.
+   * Thin orchestration: delegate to the infra client; add business checks here if needed.
    */
-  async subscribeToChannel(identifier: string): Promise<{ ok: true }> {
-    await this.tgClient.joinChannel(identifier);
+  async subscribeToChannel(identifier: string): Promise<{
+    ok: true;
+    channel: { tgId: string; username?: string; title?: string };
+  }> {
+    const info = await this.tgClient.joinAndResolve(identifier);
     // (Optional) persist subscription, emit another business event, etc.
-    return { ok: true as const };
+    return { ok: true as const, channel: info };
   }
 
   /**

@@ -1,17 +1,16 @@
 // src/main.ts
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
+import { MicroserviceOptions } from '@nestjs/microservices';
 import { rmqMicroserviceOptions } from './rabbit/rabbit.config';
-import { ConfigService } from '@nestjs/config';
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule, {
-    logger: ['log', 'error', 'warn', 'debug'],
-  });
-  const config = app.get(ConfigService);
+  const app = await NestFactory.createMicroservice<MicroserviceOptions>(
+    AppModule,
+    rmqMicroserviceOptions(process.env), // build options from env (no DI yet)
+  );
 
-  app.connectMicroservice(rmqMicroserviceOptions(config));
-  await app.startAllMicroservices();
-  // (Optional) If you also want an HTTP health port later, add app.listen
+  app.enableShutdownHooks(); // graceful stop for your TG client, RMQ, etc.
+  await app.listen(); // starts DI, runs onModuleInit hooks, and connects to RMQ
 }
 bootstrap();

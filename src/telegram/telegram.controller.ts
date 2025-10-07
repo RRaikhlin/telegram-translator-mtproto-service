@@ -1,6 +1,11 @@
 // src/telegram/telegram.controller.ts
 import { Controller } from '@nestjs/common';
-import { MessagePattern, Payload } from '@nestjs/microservices';
+import {
+  Ctx,
+  MessagePattern,
+  Payload,
+  RmqContext,
+} from '@nestjs/microservices';
 import { TelegramAppService } from './app/telegram-app.service';
 import { SubscribeDto } from './dto/subscribe.dto';
 import { FetchPostsDto } from './dto/fetch-posts.dto';
@@ -20,7 +25,7 @@ export class TelegramController {
   }
 
   @MessagePattern('telegram.health')
-  health() {
-    return this.app.health();
+  async health() {
+    return this.app.health(); // returns {status:'ok'|'down'}
   }
 }

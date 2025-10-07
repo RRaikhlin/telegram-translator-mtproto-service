@@ -1,6 +1,5 @@
+// src/app.module.ts
 import { Module } from '@nestjs/common';
-import { AppController } from './app.controller';
-import { AppService } from './app.service';
 import { ConfigModule } from '@nestjs/config';
 import { envSchema } from './config/env.validation';
 import { EventsModule } from './events/events.module';
@@ -25,7 +24,5 @@ import { TelegramModule } from './telegram/telegram.module';
     EventsModule,
     TelegramModule,
   ],
-  controllers: [AppController],
-  providers: [AppService],
 })
 export class AppModule {}

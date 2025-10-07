@@ -18,7 +18,7 @@ export class EventsPublisher {
       transport: Transport.RMQ,
       options: {
         urls: [this.config.getOrThrow<string>('RABBIT_URL')],
-        queue: this.config.getOrThrow<string>('RABBIT_SERVICE_QUEUE'),
+        queue: 'mtproto.queS',
         queueOptions: { durable: true },
         prefetchCount: this.config.get<number>('RABBIT_PREFETCH') ?? 25,
         persistent: true,
