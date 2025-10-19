@@ -1,11 +1,6 @@
 // src/telegram/telegram.controller.ts
 import { Controller } from '@nestjs/common';
-import {
-  Ctx,
-  MessagePattern,
-  Payload,
-  RmqContext,
-} from '@nestjs/microservices';
+import { MessagePattern, Payload } from '@nestjs/microservices';
 import { TelegramAppService } from './app/telegram-app.service';
 import { SubscribeDto } from './dto/subscribe.dto';
 import { FetchPostsDto } from './dto/fetch-posts.dto';
@@ -17,6 +12,11 @@ export class TelegramController {
   @MessagePattern('telegram.subscribe')
   subscribe(@Payload() dto: SubscribeDto) {
     return this.app.subscribeToChannel(dto.identifier);
+  }
+
+  @MessagePattern('telegram.unsubscribe')
+  unsubscribe(@Payload() identifier: string) {
+    return this.app.unsubscribeToChannel(identifier);
   }
 
   @MessagePattern('telegram.fetchPosts')

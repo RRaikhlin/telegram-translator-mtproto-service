@@ -16,6 +16,8 @@ import * as readline from 'node:readline/promises';
 import { stdin as input, stdout as output } from 'node:process';
 import { Entity } from 'telegram/define';
 import { safeClassName } from './helper';
+import { RPCError } from 'telegram/errors';
+import { UnsubscribeRpcResponse } from '../../shared/types/types-to-synchronize';
 
 /**
  * Purpose: Infrastructure-only wrapper around GramJS.
@@ -116,7 +118,7 @@ export class TelegramClientService implements OnModuleInit, OnModuleDestroy {
     username?: string;
     title?: string;
   }> {
-    const entity = await this.client.getEntity(identifier);
+    const entity: Entity = await this.client.getEntity(identifier);
 
     if (entity instanceof Api.Channel) {
       await this.client.invoke(
@@ -152,6 +154,83 @@ export class TelegramClientService implements OnModuleInit, OnModuleDestroy {
     }
 
     throw new Error(`Unsupported peer type: ${safeClassName(entity)}`);
+  }
+
+  async leave(identifier: string): Promise<UnsubscribeRpcResponse> {
+    const entity = await this.client.getEntity(identifier);
+
+    try {
+      if (
+        entity instanceof Api.Channel ||
+        entity instanceof Api.ChannelForbidden
+      ) {
+        // Works for broadcast channels and supergroups alike
+        await this.client.invoke(
+          new Api.channels.LeaveChannel({ channel: entity }),
+        );
+        this.logger.log(`Left channel/supergroup: ${identifier}`);
+        const kind: 'megagroup' | 'channel' =
+          entity instanceof Api.Channel && entity.megagroup
+            ? 'megagroup'
+            : 'channel';
+
+        return { left: true, kind };
+      }
+
+      if (entity instanceof Api.Chat) {
+        // Legacy small group chats
+        await this.client.invoke(
+          new Api.messages.DeleteChatUser({
+            chatId: entity.id,
+            userId: 'me', // remove myself
+          }),
+        );
+        this.logger.log(`Left legacy chat: ${identifier}`);
+        return { left: true, kind: 'chat' };
+      }
+
+      if (entity instanceof Api.User) {
+        // 1:1 dialog — no "unsubscribe". We can delete dialog history (and optionally block)
+        await this.client.invoke(
+          new Api.messages.DeleteHistory({
+            peer: entity,
+            maxId: 0, // all messages
+            revoke: false, // don't delete for the other side
+          }),
+        );
+        // Optionally, to stop bot messages: await this.client.invoke(new Api.contacts.Block({ id: entity }));
+        this.logger.log(`Deleted dialog with user: ${identifier}`);
+        return { left: true, kind: 'user' };
+      }
+
+      throw new Error(`Unsupported peer type: ${safeClassName(entity)}`);
+    } catch (err) {
+      // Make "leave" idempotent: many RPC errors just mean we're already out
+      if (err instanceof RPCError) {
+        const code = err.errorMessage ?? '';
+        // Common cases you might see when you're not a participant anymore
+        if (
+          code.includes('USER_NOT_PARTICIPANT') ||
+          code.includes('CHANNEL_PRIVATE') ||
+          code.includes('CHAT_ID_INVALID') ||
+          code.includes('CHANNEL_INVALID') ||
+          code.includes('PEER_ID_INVALID')
+        ) {
+          this.logger.warn(`Treating as already left: ${identifier} (${code})`);
+          return {
+            left: true,
+            kind:
+              entity instanceof Api.Chat
+                ? 'chat'
+                : entity instanceof Api.User
+                  ? 'user'
+                  : 'channel',
+          };
+        }
+      }
+      this.logger.error(`Failed to leave ${identifier}:`, err as Error);
+      throw err;
+    }
   }
 
   /**

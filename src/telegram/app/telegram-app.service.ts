@@ -16,6 +16,10 @@ import { TelegramClientService } from '../infra/telegram-client.service';
 // NOTE: use a relative path unless your tsconfig "paths" alias @/… is configured
 import { EventsPublisher } from '../../events/events.publisher';
 import { FetchPostsDto, NormalizedMessage } from '../dto/fetch-posts.dto';
+import {
+  SubscribeRpcResponse,
+  UnsubscribeRpcResponse,
+} from '../../shared/types/types-to-synchronize';
 
 // ---- Idempotency store (sync, in-memory for dev) -----------------------------
 
@@ -133,13 +137,16 @@ export class TelegramAppService implements OnModuleInit, OnModuleDestroy {
    * Subscribe to a channel by identifier (username, t.me link, or numeric id).
    * Thin orchestration: delegate to the infra client; add business checks here if needed.
    */
-  async subscribeToChannel(identifier: string): Promise<{
-    ok: true;
-    channel: { tgId: string; username?: string; title?: string };
-  }> {
+  async subscribeToChannel(identifier: string): Promise<SubscribeRpcResponse> {
     const info = await this.tgClient.joinAndResolve(identifier);
     // (Optional) persist subscription, emit another business event, etc.
     return { ok: true as const, channel: info };
+  }
+  async unsubscribeToChannel(
+    identifier: string,
+  ): Promise<UnsubscribeRpcResponse> {
+    const info = await this.tgClient.leave(identifier);
+    return { left: info.left, kind: info.kind };
   }
 
   /**
